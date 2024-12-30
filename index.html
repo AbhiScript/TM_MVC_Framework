@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TM-MVC</title>
+<script>
+var tm_mvc={
+_model: {},
+_controller: {},
+set model(dataObject)
+{
+this._model=dataObject;
+this.setUpBindings();
+this.updateTemplateBindings();
+this.updateConditionalBindings();
+},
+
+get model()
+{
+return this._model;
+},
+
+set controller(controllerObject)
+{
+this._controller=controllerObject;
+},
+
+get controller()
+{
+return this._controller;
+},
+
+setUpBindings: function(){
+let elements=document.querySelectorAll('[tm_mvc-attribute]');
+let self=this;
+
+elements.forEach(element=>{
+let attributeName=element.getAttribute('tm_mvc-attribute');
+let bindTo=element.getAttribute('tm_mvc-bindTo') || 'value';
+if(self.model.hasOwnProperty(attributeName))
+{
+self.updateElement(element,attributeName,bindTo);
+element.addEventListener('change',function(){
+self.model[attributeName]=self.getElementValue(element,bindTo);
+});
+
+element.addEventListener('input',function(){
+self.model[attributeName]=self.getElementValue(element,bindTo);
+});
+
+if(element.type==='radio')
+{
+document.querySelectorAll(`input[name="${element.name}"]`).forEach(radio=>{
+radio.addEventListener('change',function(){
+if(radio.checked)
+{
+self.model[attributeName]=radio.value;
+}
+});
+});
+}
+}
+});
+
+document.addEventListener('click',function(event){
+let element=event.target.closest('[tm_mvc-click]');
+if(element)
+{
+let functionName=element.getAttribute('tm_mvc-click');
+if(typeof tm_mvc.controller[functionName]==='function')
+{
+tm_mvc.controller[functionName](event);
+}
+}
+});
+},
+
+updateElement: function(element,attributeName,bindTo){
+if(element.type==='radio')
+{
+element.checked=this.model[attributeName]===element.value;
+}
+else if(element.type==='checkbox')
+{
+element.checked=this.model[attributeName];
+}
+else if(element.type==='select-multiple')
+{
+let values=this.model[attributeName];
+for(let i=0;i<element.options.length;i++)
+{
+element.options[i].selected=values.includes(element.options[i].value);
+}
+}
+else
+{
+element[bindTo]=this.model[attributeName];
+}
+},
+
+updateAllElements: function(attributeName,bindTo){
+let elements=document.querySelectorAll(`[tm_mvc-attribute="${attributeName}"]`);
+elements.forEach(element=>{
+this.updateElement(element,attributeName,bindTo);
+});
+},
+
+getElementValue: function(element,bindTo){
+if(element.type==='checkbox')
+{
+return element.checked;
+}
+else if(element.type==='select-multiple')
+{
+let selectedValues=[];
+for(let i=0;i<element.options.length;i++)
+{
+if(element.options[i].selected)
+{
+selectedValues.push(element.options[i].value);
+}
+}
+return selectedValues;
+}
+else if(element.type==='radio')
+{
+return element.checked ? element.value : '';
+}
+else
+{
+return element[bindTo];
+}
+},
+
+updateTemplateBindings: function(){
+let elements=document.querySelectorAll('[tm_mvc-text]');
+elements.forEach(element=>{
+let attributeName=element.getAttribute('tm_mvc-text');
+if(this.model.hasOwnProperty(attributeName))
+{
+element.textContent=this.model[attributeName];
+}
+});
+},
+
+updateConditionalBindings: function(){
+let elements=document.querySelectorAll('[tm_mvc-if]');
+elements.forEach(element=>{
+let condition=element.getAttribute('tm_mvc-if');
+let mode=this.model.mode;
+if(condition===`model.mode==='${mode}'`)
+{
+element.style.display = 'block';
+}
+else
+{
+element.style.display='none';
+}
+});
+}
+};
+
+// Usage Example
+class CustomerManager
+{
+constructor()
+{
+this.ds={
+customers: [],
+firstName: '',
+lastName: '',
+gender: '',
+mode: 'A',
+editIndex: -1
+};
+}
+
+addCustomer()
+{
+let newCustomer={
+firstName: tm_mvc.model.firstName,
+lastName: tm_mvc.model.lastName,
+gender: tm_mvc.model.gender
+};
+tm_mvc.model.customers.push(newCustomer);
+console.log('Customer added:', newCustomer);
+tm_mvc.model.firstName = '';
+tm_mvc.model.lastName = '';
+tm_mvc.model.gender = '';
+this.updateCustomerList();
+}
+
+viewCustomer(event)
+{
+let index = parseInt(event.target.getAttribute('data-index'), 10);
+let customer = tm_mvc.model.customers[index];
+if(customer)
+{
+tm_mvc.model.firstName=customer.firstName;
+tm_mvc.model.lastName=customer.lastName;
+tm_mvc.model.gender=customer.gender;
+tm_mvc.model.editIndex=index;
+console.log('View customer:', customer);
+tm_mvc.updateTemplateBindings();
+}
+else
+{
+console.log('No customer found at index:', index);
+}
+}
+
+updateCustomer()
+{
+let index=tm_mvc.model.editIndex;
+if(index>=0 && index<tm_mvc.model.customers.length)
+{
+let updatedCustomer={
+firstName: tm_mvc.model.firstName,
+lastName: tm_mvc.model.lastName,
+gender: tm_mvc.model.gender
+};
+tm_mvc.model.customers[index]=updatedCustomer;
+console.log('Customer updated:', updatedCustomer);
+this.updateCustomerList();
+tm_mvc.model.firstName = '';
+tm_mvc.model.lastName = '';
+tm_mvc.model.gender = '';
+tm_mvc.model.editIndex = -1;
+}
+else
+{
+console.log('Invalid index for update');
+}
+}
+
+deleteCustomer(event)
+{
+let index=parseInt(event.target.getAttribute('data-index'),10);
+if(index >= 0 && index < tm_mvc.model.customers.length)
+{
+tm_mvc.model.customers.splice(index, 1);
+console.log('Customer deleted at index:', index);
+this.updateCustomerList();
+}
+else
+{
+console.log('Invalid index for deletion');
+}
+}
+
+updateCustomerList()
+{
+let customerList = document.getElementById('customerList');
+customerList.innerHTML = '';
+tm_mvc.model.customers.forEach((customer, index)=>{
+let listItem = document.createElement('li');
+listItem.innerHTML=`
+Name: ${customer.firstName} ${customer.lastName}, Gender: ${customer.gender}
+<button type="button" tm_mvc-click="viewCustomer" data-index="${index}">View</button>
+<button type="button" tm_mvc-click="deleteCustomer" data-index="${index}">Delete</button>
+`;
+customerList.appendChild(listItem);
+});
+}
+
+toggleAddMode()
+{
+tm_mvc.model.mode = 'A';
+tm_mvc.updateConditionalBindings();
+}
+
+toggleEditMode()
+{
+tm_mvc.model.mode = 'E';
+tm_mvc.updateConditionalBindings();
+}
+
+toggleViewMode()
+{
+tm_mvc.model.mode = 'V';
+tm_mvc.updateConditionalBindings();
+}
+
+}
+
+document.addEventListener('DOMContentLoaded',function(){
+var customerManager=new CustomerManager();
+tm_mvc.model=customerManager.ds;
+tm_mvc.controller=customerManager;
+});
+</script>
+</head>
+<body>
+<h1>Customer Form</h1>
+
+<div>
+<button type="button" tm_mvc-click="toggleAddMode">Add Mode</button>
+<button type="button" tm_mvc-click="toggleEditMode">Edit Mode</button>
+<button type="button" tm_mvc-click="toggleViewMode">View Mode</button>
+</div>
+
+<div tm_mvc-if="model.mode==='A'">
+<h2>Add Customer</h2>
+<form>
+<label for="firstName">First Name:</label>
+<input type="text" id="firstName" tm_mvc-attribute="firstName" tm_mvc-bindTo="value">
+<br>
+
+<label for="lastName">Last Name:</label>
+<input type="text" id="lastName" tm_mvc-attribute="lastName" tm_mvc-bindTo="value">
+<br>
+
+<label>Gender:</label>
+<input type="radio" id="genderMale" name="gender" value="M" tm_mvc-attribute="gender" tm_mvc-bindTo="value">
+<label for="genderMale">Male</label>
+<input type="radio" id="genderFemale" name="gender" value="F" tm_mvc-attribute="gender" tm_mvc-bindTo="value">
+<label for="genderFemale">Female</label>
+<br>
+
+<button type="button" tm_mvc-click="addCustomer">Add Customer</button>
+</form>
+</div>
+
+<div tm_mvc-if="model.mode === 'E'">
+<h2>Edit Customer</h2>
+<form>
+<label for="firstName">First Name:</label>
+<input type="text" id="firstName" tm_mvc-attribute="firstName" tm_mvc-bindTo="value">
+<br>
+
+<label for="lastName">Last Name:</label>
+<input type="text" id="lastName" tm_mvc-attribute="lastName" tm_mvc-bindTo="value">
+<br>
+
+<label>Gender:</label>
+<input type="radio" id="genderMale" name="gender" value="M" tm_mvc-attribute="gender" tm_mvc-bindTo="value">
+<label for="genderMale">Male</label>
+<input type="radio" id="genderFemale" name="gender" value="F" tm_mvc-attribute="gender" tm_mvc-bindTo="value">
+<label for="genderFemale">Female</label>
+<br>
+
+<button type="button" tm_mvc-click="updateCustomer">Update Customer</button>
+<button type="button" tm_mvc-click="deleteCustomer">Delete Customer</button>
+</form>
+</div>
+
+<div tm_mvc-if="model.mode === 'V'">
+<h2>Customers List</h2>
+<ul id="customerList">
+
+</ul>
+</div>
+
+</body>
+</html>
