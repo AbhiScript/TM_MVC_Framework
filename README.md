@@ -1,5 +1,3 @@
-# TM_MVC_Framework
-The TM-MVC project demonstrates a lightweight JavaScript framework inspired by the MVC (Model-View-Controller) architectural pattern. It enables dynamic binding of UI elements to data models without relying on external libraries or frameworks like Angular or React
 # TM-MVC (Template Model-View-Controller)
 
 TM-MVC is a lightweight JavaScript-based MVC framework designed to enable two-way data binding, dynamic UI updates, and event-driven programming without relying on external libraries. This project includes an example application for managing customer data, demonstrating CRUD functionality and conditional rendering.
